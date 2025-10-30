@@ -1,14 +1,16 @@
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Badge } from "@/components/ui/badge";
 
 // Fix Leaflet default marker icon issue with Vite
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
 interface MapMarker {
@@ -71,48 +73,114 @@ const MapView = ({ markers = [], onMarkerClick }: MapViewProps) => {
 
   // Mock markers for demo - Dakar, Senegal area
   const demoMarkers: MapMarker[] = [
-    { id: "1", type: "agent", lat: 14.7167, lng: -17.4677, status: "available", label: "Agent A. Diallo" },
-    { id: "2", type: "agent", lat: 14.7200, lng: -17.4500, status: "busy", label: "Agent M. Ndiaye" },
-    { id: "3", type: "incident", lat: 14.6800, lng: -17.4200, status: "urgent", label: "Incident sécurité" },
-    { id: "4", type: "incident", lat: 14.7500, lng: -17.3800, status: "medium", label: "Assistance médicale" },
+    {
+      id: "1",
+      type: "agent",
+      lat: 14.7167,
+      lng: -17.4677,
+      status: "available",
+      label: "Agent A. Diallo",
+    },
+    {
+      id: "2",
+      type: "agent",
+      lat: 14.72,
+      lng: -17.45,
+      status: "busy",
+      label: "Agent M. Ndiaye",
+    },
+    {
+      id: "3",
+      type: "incident",
+      lat: 14.68,
+      lng: -17.42,
+      status: "urgent",
+      label: "Incident sécurité",
+    },
+    {
+      id: "4",
+      type: "incident",
+      lat: 14.75,
+      lng: -17.38,
+      status: "medium",
+      label: "Assistance médicale",
+    },
   ];
 
-  const displayMarkers = markers.length > 0 ? markers : demoMarkers;
+  const displayMarkers = useMemo(
+    () => (markers.length > 0 ? markers : demoMarkers),
+    [markers]
+  );
 
   const center: [number, number] = [14.7167, -17.4677];
 
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+
+  // Initialize map once
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const map = L.map(containerRef.current, {
+      center,
+      zoom: 13,
+      zoomControl: true,
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update markers whenever data changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Clear existing layer
+    if (markersLayerRef.current) {
+      map.removeLayer(markersLayerRef.current);
+    }
+
+    const group = L.layerGroup();
+
+    displayMarkers.forEach((m) => {
+      const marker = L.marker([m.lat, m.lng], {
+        icon: createCustomIcon(m.type, m.status),
+      });
+
+      marker.on("click", () => onMarkerClick?.(m.id));
+
+      const popupHtml = `
+        <div class="p-2">
+          <p class="font-semibold text-sm">${m.label ?? ""}</p>
+          <span class="mt-1 text-xs inline-block rounded border px-2 py-0.5">${
+            m.type === "agent" ? "Agent" : "Incident"
+          }</span>
+        </div>
+      `;
+
+      marker.bindPopup(popupHtml);
+      marker.addTo(group);
+    });
+
+    group.addTo(map);
+    markersLayerRef.current = group;
+  }, [displayMarkers, onMarkerClick]);
+
   return (
     <div className="relative h-full w-full rounded-xl overflow-hidden shadow-orion-lg">
-      <MapContainer
-        center={center}
-        zoom={13}
-        style={{ width: "100%", height: "100%" }}
-        zoomControl={true}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        {displayMarkers.map((marker) => (
-          <Marker
-            key={marker.id}
-            position={[marker.lat, marker.lng]}
-            icon={createCustomIcon(marker.type, marker.status)}
-            eventHandlers={{
-              click: () => onMarkerClick?.(marker.id),
-            }}
-          >
-            <Popup>
-              <div className="p-2">
-                <p className="font-semibold text-sm">{marker.label}</p>
-                <Badge variant="outline" className="mt-1 text-xs">
-                  {marker.type === "agent" ? "Agent" : "Incident"}
-                </Badge>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+      <div ref={containerRef} className="absolute inset-0" />
 
       {/* Legend */}
       <div className="absolute top-4 left-4 z-10 bg-card/95 backdrop-blur rounded-lg p-3 shadow-orion">
