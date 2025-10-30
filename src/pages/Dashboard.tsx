@@ -10,15 +10,24 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 
+interface Incident {
+  id: string;
+  type: string;
+  location: string;
+  urgency: "urgent" | "medium" | "low";
+  status: "pending" | "assigned" | "resolved";
+  agent?: string;
+  time: string;
+}
+
 const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
-
-  const incidents = [
-    { id: "1", type: "Incident de sécurité", location: "Stade Lat Dior", urgency: "urgent" as const, status: "pending" as const, time: "Il y a 5 min" },
-    { id: "2", type: "Assistance médicale", location: "Zone VIP", urgency: "medium" as const, status: "assigned" as const, agent: "Dr. A. Diallo", time: "Il y a 12 min" },
-    { id: "3", type: "Problème technique", location: "Entrée principale", urgency: "low" as const, status: "pending" as const, time: "Il y a 23 min" },
-    { id: "4", type: "Contrôle foule", location: "Parking nord", urgency: "urgent" as const, status: "assigned" as const, agent: "M. Ndiaye", time: "Il y a 35 min" },
-  ];
+  const [incidents, setIncidents] = useState<Incident[]>([
+    { id: "1", type: "Incident de sécurité", location: "Stade Lat Dior", urgency: "urgent", status: "pending", time: "Il y a 5 min" },
+    { id: "2", type: "Assistance médicale", location: "Zone VIP", urgency: "medium", status: "assigned", agent: "Dr. A. Diallo", time: "Il y a 12 min" },
+    { id: "3", type: "Problème technique", location: "Entrée principale", urgency: "low", status: "pending", time: "Il y a 23 min" },
+    { id: "4", type: "Contrôle foule", location: "Parking nord", urgency: "urgent", status: "assigned", agent: "M. Ndiaye", time: "Il y a 35 min" },
+  ]);
 
   const agents = [
     { id: "1", name: "Amadou Diallo", status: "available" as const, location: "Secteur A", distance: "1.2 km", phone: "+221 XX XXX XX XX" },
@@ -28,6 +37,11 @@ const Dashboard = () => {
   ];
 
   const handleAssignAgent = (incidentId: string) => {
+    setIncidents(incidents.map(incident => 
+      incident.id === incidentId 
+        ? { ...incident, status: "assigned" as const, agent: "Agent assigné" }
+        : incident
+    ));
     toast.success("Agent assigné avec succès", {
       description: "L'agent a été notifié de cette intervention.",
     });
