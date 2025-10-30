@@ -1,8 +1,8 @@
-import { useState, useCallback } from "react";
-import { GoogleMap, LoadScript, Marker, InfoWindow } from "@react-google-maps/api";
+import { useEffect } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 interface MapMarker {
   id: string;
@@ -19,19 +19,47 @@ interface MapViewProps {
 }
 
 const MapView = ({ markers = [], onMarkerClick }: MapViewProps) => {
-  const [apiKey, setApiKey] = useState("");
-  const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
-
-  const getMarkerIcon = (type: string, status?: string) => {
-    // Define marker colors based on type and status
+  const getMarkerColor = (type: string, status?: string) => {
     if (type === "agent") {
-      if (status === "available") return "#10b981"; // green
-      if (status === "busy") return "#f59e0b"; // orange
-      return "#ef4444"; // red
+      if (status === "available") return "#10b981";
+      if (status === "busy") return "#f59e0b";
+      return "#ef4444";
     }
-    if (status === "urgent") return "#f59e0b"; // orange
-    if (status === "medium") return "#3b82f6"; // blue
-    return "#10b981"; // green
+    if (status === "urgent") return "#f59e0b";
+    if (status === "medium") return "#3b82f6";
+    return "#10b981";
+  };
+
+  const createCustomIcon = (type: string, status?: string) => {
+    const color = getMarkerColor(type, status);
+    return L.divIcon({
+      className: "custom-marker",
+      html: `
+        <div style="position: relative;">
+          <div style="
+            width: 24px;
+            height: 24px;
+            background-color: ${color};
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+          "></div>
+          <div style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 24px;
+            height: 24px;
+            background-color: ${color};
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+          "></div>
+        </div>
+      `,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
   };
 
   // Mock markers for demo - Dakar, Senegal area
@@ -44,99 +72,40 @@ const MapView = ({ markers = [], onMarkerClick }: MapViewProps) => {
 
   const displayMarkers = markers.length > 0 ? markers : demoMarkers;
 
-  const mapContainerStyle = {
-    width: "100%",
-    height: "100%",
-  };
-
-  const center = {
-    lat: 14.7167,
-    lng: -17.4677,
-  };
-
-  const handleMarkerClick = useCallback((markerId: string) => {
-    setSelectedMarker(markerId);
-    onMarkerClick?.(markerId);
-  }, [onMarkerClick]);
-
-  if (!apiKey) {
-    return (
-      <div className="relative h-full w-full rounded-xl overflow-hidden shadow-orion-lg bg-card flex items-center justify-center p-8">
-        <div className="max-w-md w-full space-y-4">
-          <div className="space-y-2 text-center">
-            <h3 className="text-lg font-semibold">Configuration Google Maps</h3>
-            <p className="text-sm text-muted-foreground">
-              Pour afficher la carte, veuillez entrer votre clé API Google Maps
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">Clé API Google Maps</Label>
-            <Input
-              id="apiKey"
-              type="text"
-              placeholder="Entrez votre clé API"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Obtenez votre clé API sur{" "}
-              <a
-                href="https://console.cloud.google.com/google/maps-apis"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                Google Cloud Console
-              </a>
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const center: [number, number] = [14.7167, -17.4677];
 
   return (
     <div className="relative h-full w-full rounded-xl overflow-hidden shadow-orion-lg">
-      <LoadScript googleMapsApiKey={apiKey}>
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={center}
-          zoom={13}
-          options={{
-            zoomControl: true,
-            streetViewControl: false,
-            mapTypeControl: false,
-            fullscreenControl: false,
-          }}
-        >
-          {displayMarkers.map((marker) => (
-            <Marker
-              key={marker.id}
-              position={{ lat: marker.lat, lng: marker.lng }}
-              onClick={() => handleMarkerClick(marker.id)}
-              icon={{
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 10,
-                fillColor: getMarkerIcon(marker.type, marker.status),
-                fillOpacity: 1,
-                strokeColor: "#ffffff",
-                strokeWeight: 2,
-              }}
-            >
-              {selectedMarker === marker.id && (
-                <InfoWindow onCloseClick={() => setSelectedMarker(null)}>
-                  <div className="p-2">
-                    <p className="font-semibold">{marker.label}</p>
-                    <Badge variant="outline" className="mt-1">
-                      {marker.type === "agent" ? "Agent" : "Incident"}
-                    </Badge>
-                  </div>
-                </InfoWindow>
-              )}
-            </Marker>
-          ))}
-        </GoogleMap>
-      </LoadScript>
+      <MapContainer
+        center={center}
+        zoom={13}
+        style={{ width: "100%", height: "100%" }}
+        zoomControl={true}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {displayMarkers.map((marker) => (
+          <Marker
+            key={marker.id}
+            position={[marker.lat, marker.lng]}
+            icon={createCustomIcon(marker.type, marker.status)}
+            eventHandlers={{
+              click: () => onMarkerClick?.(marker.id),
+            }}
+          >
+            <Popup>
+              <div className="p-2">
+                <p className="font-semibold text-sm">{marker.label}</p>
+                <Badge variant="outline" className="mt-1 text-xs">
+                  {marker.type === "agent" ? "Agent" : "Incident"}
+                </Badge>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
 
       {/* Legend */}
       <div className="absolute top-4 left-4 z-10 bg-card/95 backdrop-blur rounded-lg p-3 shadow-orion">
