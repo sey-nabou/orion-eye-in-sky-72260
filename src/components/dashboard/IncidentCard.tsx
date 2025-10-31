@@ -1,4 +1,4 @@
-import { AlertTriangle, MapPin, Clock, User } from "lucide-react";
+import { AlertTriangle, MapPin, Clock, User, Camera, Brain } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,12 @@ interface IncidentCardProps {
   agent?: string;
   time: string;
   onAssign?: (id: string) => void;
+  source?: "manual" | "camera" | "ai";
+  cameraId?: string;
+  assignedBy?: "manual" | "ai";
 }
 
-const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssign }: IncidentCardProps) => {
+const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssign, source, cameraId, assignedBy }: IncidentCardProps) => {
   const urgencyVariants = {
     urgent: { variant: "warning" as const, text: "Urgent" },
     medium: { variant: "default" as const, text: "Moyen" },
@@ -30,6 +33,13 @@ const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssi
   return (
     <Card className="transition-orion hover:shadow-orion animate-fade-in">
       <CardContent className="p-4">
+        {source === "camera" && cameraId && (
+          <div className="flex items-center gap-2 mb-2 text-xs bg-primary/5 rounded px-2 py-1 border border-primary/20">
+            <Camera className="h-3 w-3 text-primary" />
+            <span className="text-primary font-medium">Détecté par Caméra #{cameraId}</span>
+          </div>
+        )}
+        
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-warning/10 rounded-lg">
@@ -63,9 +73,17 @@ const IncidentCard = ({ id, type, location, urgency, status, agent, time, onAssi
         </div>
 
         <div className="flex items-center justify-between">
-          <Badge variant={statusVariants[status].variant} className="text-xs">
-            {statusVariants[status].text}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={statusVariants[status].variant} className="text-xs">
+              {statusVariants[status].text}
+            </Badge>
+            {assignedBy === "ai" && status === "assigned" && (
+              <Badge variant="default" className="text-[10px] gap-1 bg-primary/10 text-primary border-primary/20">
+                <Brain className="h-2.5 w-2.5" />
+                Affecté par IA
+              </Badge>
+            )}
+          </div>
           
           {status === "pending" && onAssign && (
             <Button 

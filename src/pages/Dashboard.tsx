@@ -5,43 +5,131 @@ import StatsCard from "@/components/dashboard/StatsCard";
 import IncidentCard from "@/components/dashboard/IncidentCard";
 import AgentCard from "@/components/dashboard/AgentCard";
 import MapView from "@/components/dashboard/MapView";
+import AIEngine from "@/components/dashboard/AIEngine";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-
-interface Incident {
-  id: string;
-  type: string;
-  location: string;
-  urgency: "urgent" | "medium" | "low";
-  status: "pending" | "assigned" | "resolved";
-  agent?: string;
-  time: string;
-}
+import { useAIIncidentManager, type Agent, type Incident } from "@/hooks/useAIIncidentManager";
 
 const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [incidents, setIncidents] = useState<Incident[]>([
-    { id: "1", type: "Incident de sécurité", location: "Stade Lat Dior", urgency: "urgent", status: "pending", time: "Il y a 5 min" },
-    { id: "2", type: "Assistance médicale", location: "Zone VIP", urgency: "medium", status: "assigned", agent: "Dr. A. Diallo", time: "Il y a 12 min" },
-    { id: "3", type: "Problème technique", location: "Entrée principale", urgency: "low", status: "pending", time: "Il y a 23 min" },
-    { id: "4", type: "Contrôle foule", location: "Parking nord", urgency: "urgent", status: "assigned", agent: "M. Ndiaye", time: "Il y a 35 min" },
-  ]);
 
-  const agents = [
-    { id: "1", name: "Amadou Diallo", status: "available" as const, location: "Secteur A", distance: "1.2 km", phone: "+221 XX XXX XX XX" },
-    { id: "2", name: "Mariama Ndiaye", status: "busy" as const, location: "Secteur B", distance: "2.5 km" },
-    { id: "3", name: "Ibrahima Sarr", status: "available" as const, location: "Secteur C", distance: "0.8 km", phone: "+221 XX XXX XX XX" },
-    { id: "4", name: "Fatou Sow", status: "offline" as const, location: "Secteur D", distance: "3.1 km" },
+  // Agents avec localisation réelle au Sénégal et compétences
+  const agents: Agent[] = [
+    { 
+      id: "1", 
+      name: "Amadou Diallo", 
+      status: "available", 
+      location: "Dakar Plateau", 
+      distance: "1.2 km", 
+      phone: "+221 77 123 45 67",
+      lat: 14.6937,
+      lng: -17.4441,
+      skills: ["sécurité", "médical"]
+    },
+    { 
+      id: "2", 
+      name: "Mariama Ndiaye", 
+      status: "busy", 
+      location: "Mbour", 
+      distance: "2.5 km",
+      lat: 14.4199,
+      lng: -16.9619,
+      skills: ["médical"]
+    },
+    { 
+      id: "3", 
+      name: "Ibrahima Sarr", 
+      status: "available", 
+      location: "Rufisque", 
+      distance: "0.8 km", 
+      phone: "+221 76 234 56 78",
+      lat: 14.7128,
+      lng: -17.2695,
+      skills: ["sécurité", "technique"]
+    },
+    { 
+      id: "4", 
+      name: "Fatou Sow", 
+      status: "available", 
+      location: "Thiès", 
+      distance: "3.1 km",
+      lat: 14.7886,
+      lng: -16.9262,
+      skills: ["médical", "sécurité"]
+    },
+    { 
+      id: "5", 
+      name: "Ousmane Ba", 
+      status: "available", 
+      location: "Pikine", 
+      distance: "1.8 km", 
+      phone: "+221 78 345 67 89",
+      lat: 14.7549,
+      lng: -17.3964,
+      skills: ["technique"]
+    },
+    { 
+      id: "6", 
+      name: "Awa Diop", 
+      status: "available", 
+      location: "Kaolack", 
+      distance: "4.2 km",
+      lat: 14.1522,
+      lng: -16.0725,
+      skills: ["médical"]
+    },
   ];
 
+  // Incidents initiaux avec localisation sénégalaise
+  const initialIncidents: Incident[] = [
+    { 
+      id: "1", 
+      type: "Incident de sécurité", 
+      location: "Dakar Plateau", 
+      urgency: "urgent", 
+      status: "pending", 
+      time: "Il y a 5 min",
+      lat: 14.6937,
+      lng: -17.4441,
+      source: "manual"
+    },
+    { 
+      id: "2", 
+      type: "Assistance médicale urgente", 
+      location: "Mbour", 
+      urgency: "medium", 
+      status: "assigned", 
+      agent: "Mariama Ndiaye", 
+      time: "Il y a 12 min",
+      lat: 14.4199,
+      lng: -16.9619,
+      source: "manual",
+      assignedBy: "manual"
+    },
+    { 
+      id: "3", 
+      type: "Problème technique", 
+      location: "Rufisque", 
+      urgency: "low", 
+      status: "pending", 
+      time: "Il y a 23 min",
+      lat: 14.7128,
+      lng: -17.2695,
+      source: "manual"
+    },
+  ];
+
+  const { 
+    incidents, 
+    aiActivity, 
+    aiStats, 
+    manualAssign 
+  } = useAIIncidentManager(initialIncidents, agents, true);
+
   const handleAssignAgent = (incidentId: string) => {
-    setIncidents(incidents.map(incident => 
-      incident.id === incidentId 
-        ? { ...incident, status: "assigned" as const, agent: "Agent assigné" }
-        : incident
-    ));
+    manualAssign(incidentId);
     toast.success("Agent assigné avec succès", {
       description: "L'agent a été notifié de cette intervention.",
     });
@@ -52,6 +140,13 @@ const Dashboard = () => {
       <Header />
       
       <main className="container px-4 py-6 space-y-6">
+        {/* AI Engine Status */}
+        <AIEngine 
+          isActive={true}
+          currentActivity={aiActivity}
+          stats={aiStats}
+        />
+
         {/* Stats Section */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatsCard
@@ -63,23 +158,23 @@ const Dashboard = () => {
           />
           <StatsCard
             title="Agents disponibles"
-            value="15"
+            value={agents.filter(a => a.status === "available").length.toString()}
             icon={Users}
-            trend="75% de couverture"
+            trend="Disponibles maintenant"
             variant="success"
           />
           <StatsCard
-            title="Temps moyen"
-            value="4:32"
+            title="Temps moyen IA"
+            value={`${aiStats.avgAssignmentTime}s`}
             icon={Clock}
-            trend="-12% vs hier"
+            trend="Affectation automatique"
             variant="default"
           />
           <StatsCard
-            title="Taux résolution"
-            value="94%"
+            title="Précision IA"
+            value={`${aiStats.accuracy}%`}
             icon={Activity}
-            trend="+3% ce mois"
+            trend={`${aiStats.totalAutoAssignments} auto-affectations`}
             variant="success"
           />
         </div>
